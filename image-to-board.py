@@ -28,7 +28,7 @@ def setup_image(image_relative_path: str,resize: tuple[float,float],threshold: i
     black_and_white = img.point(lambda p: p > threshold and 255)
     return black_and_white
 
-def create_mbf(img,reduce_if_over: bool,just_edge: bool):
+def create_mbf(name: str,img,reduce_if_over: bool,just_edge: bool):
     """
     Creates a regular mbf file for use in minesweeper programs. Uses already specified bomb pixel color
     :param img: The image to make mbf from
@@ -36,7 +36,6 @@ def create_mbf(img,reduce_if_over: bool,just_edge: bool):
     :param just_edge: If only the edge between white and black zones should become bombs
     :return: Nothing
     """
-    name = img.filename.split(".")[0]
     pixels = img.load()
     mbf_list = []
     height = img.height
@@ -58,8 +57,7 @@ def create_mbf(img,reduce_if_over: bool,just_edge: bool):
             assert cpixel[2] == 0 or cpixel[2] == 255, f"Found non 0 or 255 at {x} {y} found {cpixel[2]}"
             if cpixel[0] == BOMB:
                 num_bombs += 1
-                bomb_indices.append(x)
-                bomb_indices.append(y)
+                bomb_indices.append((x,y))
     print(f"Num bombs in image: {num_bombs}")
     if just_edge:
         bomb_indices = reduce_bomb_to_edge(pixels,width,height)
@@ -78,7 +76,9 @@ def create_mbf(img,reduce_if_over: bool,just_edge: bool):
     mbf_list.append(math.floor(num_bombs / 256))
     mbf_list.append(num_bombs % 256)
 
-    mbf_list += bomb_indices
+    for _ in bomb_indices:
+        mbf_list.append(_[0])
+        mbf_list.append(_[1])
 
     mbf_array = np.array(mbf_list, np.uint8)
     mbf_array.tofile(f"{name}.mbf")
@@ -101,7 +101,7 @@ def get_adjacent_value(pixels, x: int, y: int, width: int, height: int, dx: int,
         return BOMB
     return pixels[nx, ny][0]
 
-def reduce_bomb_to_edge(pixels, width: int, height: int) -> list[int]:
+def reduce_bomb_to_edge(pixels, width: int, height: int) -> list[tuple[int,int]]:
     """
 
     :param pixels: The pixels of the image
@@ -119,18 +119,17 @@ def reduce_bomb_to_edge(pixels, width: int, height: int) -> list[int]:
                 cpixel = pixels[x, y][0]
                 has_black_adjacent = any(get_adjacent_value(pixels, x, y, width, height, dx, dy) != BOMB for dx, dy in directions)
                 if cpixel == BOMB and has_black_adjacent:
-                    reduced_indices.append(x)
-                    reduced_indices.append(y)
+                    reduced_indices.append((x,y))
             except Exception as e:
                 print(f"Error encountered at x: {x} and y: {y} {e}")
 
     return reduced_indices
 
 try:
-    filepath = "bad apple sample.bmp"
+    filepath = "mario.bmp"
     BOMB = 255
     result = setup_image(filepath,(254,254),200)
-    create_mbf(result,True,False)
+    create_mbf(filepath.split(".")[0],result,True,False)
 except FileNotFoundError:
     print("Could not find image")
 except Exception as e:
