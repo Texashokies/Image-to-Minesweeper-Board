@@ -43,6 +43,8 @@ def setup_image(image_relative_path: str,resize: tuple[float,float],will_resize:
     if will_resize and img.size > resize:
         img.thumbnail(resize)
     black_and_white = img.point(lambda p: p > threshold and 255)
+    if(DEBUG and THRESHOLD_SET):
+        black_and_white.show()
     return black_and_white
 
 def create_mbf(name: str,img,reduce_if_over: bool,just_edge: bool):
@@ -153,10 +155,12 @@ parser.add_argument("-c","--Color",help="black or white (case insensitive), the 
 parser.add_argument("-r","--Resize",help="Dimmensions to resize image to (width,height), (254,254) to work with arbiter.", required=False)
 parser.add_argument("-re","--ReduceBombs",help= "If the script should try to be limited to 255 bombs. If above try to use edges only. Do not use with Edge option", action="store_true",required=False)
 parser.add_argument("-e","--Edge",help="If the script should make board based of edges between white and black areas. Do not use with ReduceBombs option",action="store_true",required=False)
-parser.add_argument("-d","--Debug",help="Run the script in debug mod and gett more logging",action="store_true",required=False)
+parser.add_argument("-d","--Debug",help="Run the script in debug mod and gett more logging. Will show image if threshold value is set.",action="store_true",required=False)
+parser.add_argument("-t","--Threshold",help="Threshold value for images for if pixel should be black or white. Use if image is not showing as desired. Use debug to see result.",required=False)
 args = parser.parse_args()
 
 DEBUG = args.Debug
+THRESHOLD_SET = False
 
 try:
     filepath = args.File
@@ -173,7 +177,13 @@ try:
     else:
         resize_arg = ast.literal_eval(args.Resize)
 
-    result = setup_image(filepath,resize_arg,will_resize_arg,200)
+    if args.Threshold is None:
+        threshold_arg = 200
+    else:
+        threshold_arg = int(args.Threshold)
+        THRESHOLD_SET = True
+
+    result = setup_image(filepath,resize_arg,will_resize_arg,threshold_arg)
     create_mbf(filepath.split(".")[0],result,args.ReduceBombs,args.Edge)
 except FileNotFoundError:
     print("Could not find image")
