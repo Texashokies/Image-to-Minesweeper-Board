@@ -157,6 +157,7 @@ parser.add_argument("-re","--ReduceBombs",help= "If the script should try to be 
 parser.add_argument("-e","--Edge",help="If the script should make board based of edges between white and black areas. Do not use with ReduceBombs option",action="store_true",required=False)
 parser.add_argument("-d","--Debug",help="Run the script in debug mod and gett more logging. Will show image if threshold value is set.",action="store_true",required=False)
 parser.add_argument("-t","--Threshold",help="Threshold value for images for if pixel should be black or white. Use if image is not showing as desired. Use debug to see result.",required=False)
+parser.add_argument("-n","--Name",help="The name of the created mbf file.",required=False)
 args = parser.parse_args()
 
 DEBUG = args.Debug
@@ -183,8 +184,11 @@ try:
         threshold_arg = int(args.Threshold)
         THRESHOLD_SET = True
 
+    if args.Name is None:
+        args.Name = filepath.split(".")[0]
+
     result = setup_image(filepath,resize_arg,will_resize_arg,threshold_arg)
-    create_mbf(filepath.split(".")[0],result,args.ReduceBombs,args.Edge)
+    create_mbf(args.Name,result,args.ReduceBombs,args.Edge)
 except FileNotFoundError:
     print("Could not find image")
 except Exception as e:
