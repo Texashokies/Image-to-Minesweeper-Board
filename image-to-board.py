@@ -173,7 +173,7 @@ try:
     will_resize_arg = True
     resize_arg = args.Resize
     if args.Resize is None:
-        resize_arg = (254, 254)
+        resize_arg = (255, 255)
         will_resize_arg = False
     else:
         resize_arg = ast.literal_eval(args.Resize)
