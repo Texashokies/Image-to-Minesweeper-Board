@@ -1,7 +1,6 @@
 import ast
 import math
-from contextlib import nullcontext
-
+import random
 import numpy as np
 from PIL import Image, ImageFile
 import argparse
@@ -47,7 +46,7 @@ def setup_image(image_relative_path: str,resize: tuple[float,float],will_resize:
         black_and_white.show()
     return black_and_white
 
-def create_mbf(name: str,img,reduce_if_over: bool,just_edge: bool):
+def create_mbf(name: str,img,reduce_if_over: bool,just_edge: bool,add_bombs: bool):
     """
     Creates a regular mbf file for use in minesweeper programs. Uses already specified bomb pixel color
     :param name: The name for the created mbf file
@@ -81,17 +80,19 @@ def create_mbf(name: str,img,reduce_if_over: bool,just_edge: bool):
                 bomb_indices.append((x,y))
     if just_edge:
         bomb_indices = reduce_bomb_to_edge(pixels,width,height)
-        num_bombs = len(bomb_indices)
+        if add_bombs:
+            additional_bomb_count = get_num_additional_mines(width,height)
+            additional_bombs = distribute_bombs(width,height,bomb_indices,additional_bomb_count)
+            bomb_indices = bomb_indices + additional_bombs
     elif reduce_if_over and num_bombs > 256:
         print(f"Num bombs in image pre-reduction: {num_bombs}")
         reduced_indices = reduce_bomb_to_edge(pixels,width,height)
         if len(reduced_indices) <= 256 :
             bomb_indices = reduced_indices
-            num_bombs = len(bomb_indices)
         else:
             raise TooManyBombs(f"Found {num_bombs} after reduction to just edges")
 
-
+    num_bombs = len(bomb_indices)
     print(f"Num bombs in image: {num_bombs}")
 
     mbf_list.append(math.floor(num_bombs / 256))
@@ -139,14 +140,53 @@ def reduce_bomb_to_edge(pixels, width: int, height: int) -> list[tuple[int,int]]
     for y in range(height):
         for x in range(width):
             try:
-                cpixel = pixels[x, y][0]
-                has_black_adjacent = any(get_adjacent_value(pixels, x, y, width, height, dx, dy) != BOMB for dx, dy in directions)
-                if cpixel == BOMB and has_black_adjacent:
+                pixel = pixels[x, y][0]
+                has_non_bomb_adjacent = any(get_adjacent_value(pixels, x, y, width, height, dx, dy) != BOMB for dx, dy in directions)
+                if pixel == BOMB and has_non_bomb_adjacent:
                     reduced_indices.append((x,y))
             except Exception as e:
                 print(f"Error encountered at x: {x} and y: {y} {e}")
 
     return reduced_indices
+
+def distribute_bombs(width: int, height: int, edges: list[tuple[int,int]], num_bombs: int) -> list[tuple[int,int]]:
+    """
+    :param width: The width of the board
+    :param height: The height of the board
+    :param edges: The already placed bomb edges
+    :param num_bombs: The number of bombs to distribute
+    :return: List of x,y coordinates for bombs
+    """
+    directions = [(-1, -1), (0, -1), (1, -1), (1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0)]
+    possible_points = []
+    for x in range(width):
+        for y in range(height):
+            if edges.count((x,y)) == 0 and not any(has_edge_adjacent(x,y,dx,dy,edges) for dx,dy in directions):
+                possible_points.append((x,y))
+    random.shuffle(possible_points)
+    return possible_points[:num_bombs]
+
+
+def has_edge_adjacent(x:int, y:int,dx: int, dy: int, edges: list[tuple[int,int]]) -> bool:
+    """
+    Checks if there is an already placed edge bomb adjacent
+    :param x: The x coordinate
+    :param y: The y coordinate
+    :param dx: The difference in x to check
+    :param dy: The difference in y to check
+    :param edges: The already existing edges
+    :return: If there is an edge adjacent to this position
+    """
+    nx, ny = x + dx, y + dy
+    return bool(edges.count((nx,ny)))
+
+def get_num_additional_mines(width:int, height: int)->int:
+    if width >= 30 and height >= 16:
+        return math.floor((width * height) * 0.20)
+    elif width >= 16 and height >= 16:
+        return math.floor((width * height) * 0.15)
+    else:
+        return math.floor((width * height) * 0.12)
 
 parser = argparse.ArgumentParser("Image To Minesweeper Board",
                                  "Converts images to mfb files that can be loaded by minesweeper programs like Arbiter or JSMinesweeper")
@@ -158,6 +198,7 @@ parser.add_argument("-e","--Edge",help="If the script should make board based of
 parser.add_argument("-d","--Debug",help="Run the script in debug mod and gett more logging. Will show image if threshold value is set.",action="store_true",required=False)
 parser.add_argument("-t","--Threshold",help="Threshold value for images for if pixel should be black or white. Use if image is not showing as desired. Use debug to see result.",required=False)
 parser.add_argument("-n","--Name",help="The name of the created mbf file.",required=False)
+parser.add_argument("-a","--AddBombs",help="Adds additional bombs randomly to board to make it more enjoyable.",action="store_true",required=False)
 args = parser.parse_args()
 
 DEBUG = args.Debug
@@ -187,8 +228,11 @@ try:
     if args.Name is None:
         args.Name = filepath.split(".")[0]
 
+    if args.AddBombs is None:
+        args.AddBombs = False
+
     result = setup_image(filepath,resize_arg,will_resize_arg,threshold_arg)
-    create_mbf(args.Name,result,args.ReduceBombs,args.Edge)
+    create_mbf(args.Name,result,args.ReduceBombs,args.Edge,args.AddBombs)
 except FileNotFoundError:
     print("Could not find image")
 except Exception as e:
